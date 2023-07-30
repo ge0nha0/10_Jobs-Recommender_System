@@ -1,0 +1,2 @@
+RAW_DATASET_ROOT_FOLDER = 'data'
+MODEL_RESULT_ROOT_FOLDER = 'model_result'
