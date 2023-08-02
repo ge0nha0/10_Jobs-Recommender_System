@@ -4,5 +4,5 @@
 
 ### Test command
 ```
-!python main.pi --mode train
+!python main.py --mode train
 ```
