@@ -3,4 +3,6 @@
 
 
 ### Test command
+'''
 !python main.pi --mode train
+'''
