@@ -2,7 +2,34 @@ import pandas as pd
 import numpy as np
 import re
 
-class ppc_job_simple:
+
+class ppc_tool:
+
+    def __init__(self):
+        pass
+
+        # Regex Filtering #
+    def ppc_time(self,x):
+        p = re.compile('[0-9].*년|[0-9].*(\.|월|\/|일)|[0-9].*(\:|시|분)')
+        return p.sub('',x)
+
+    def ppc_e_address(self,x):
+        p = re.compile('[a-zA-Z0-9]*@[a-zA-Z0-9]*\.[a-zA-Z0-9]*|((https?://|www|WWW).*?( |$))')
+        return p.sub('',x)
+
+    def ppc_phone(self,x):
+        p = re.compile('[0-9]{2,3}-[0-9]{3,4}-[0-9]{4}')
+        return p.sub('',x)
+
+    def ppc_tag(self,x):
+        p = re.compile('&#39|&gt|&lt|&quot|&apos|#NAME?')
+        return p.sub('',x)
+    
+    def ppc_special(self,x):
+        p = re.compile('[^가-힣0-9a-zA-Z\s]|\r|\n|\t')
+        return p.sub(' ',x)
+
+class ppc_job_simple(ppc_tool):
     def __init__(self, df):
         self.df = df
 
@@ -11,6 +38,8 @@ class ppc_job_simple:
         df = self.ppc_nan(df)
         df['회사명'] = df['회사명'].apply(self.ppc_co_name)
         df = self.ppc_wage(df)
+        df = self.ppc_domain(df)
+        df.drop(columns=['직종코드','직종코드3','임금형태','최소임금액','최대임금액'],inplace=True)
         return df
 
     # 결측치 현황을 제공하고 선택적으로 결측치를 처리할 수 있는 함수 # 
@@ -32,10 +61,12 @@ class ppc_job_simple:
 
     # 임금 단일화 및 전처리 # 
     def ppc_wage(self, df):
+        df['최대임금액'] = df['최대임금액'].astype('int')
+        df['최소임금액'] = df['최소임금액'].astype('int')
         df['평균임금'] = df.apply(self.avg_wage,axis=1)
         df['평균임금'] = df.apply(self.unify_wage,axis=1)
         df['평균임금'] = round(df['평균임금'],-4)
-        df['평균임금'] = df['평균임금'].astype('string')
+        df['평균임금'] = df['평균임금'].astype('string')  
         return df
 
     # 평균 임금 추출 #
@@ -62,9 +93,17 @@ class ppc_job_simple:
         else:
             return df['평균임금']
         
+    def ppc_domain(self,df):
+        domain_code = pd.read_csv('data/raw_data/직종코드.csv',encoding='mbcs',dtype='string')[['직종코드3','직종명3','직종명2','직종명1']]
+        df = df.merge(domain_code,how='inner',left_on='직종코드',right_on='직종코드3') #직종코드 사전에 없는 직종코드는 삭제
+        df.dropna(subset=['직종코드3'],inplace=True)
+        df['직종명3'] = df['직종명3'].apply(self.ppc_special)
+        df['직종명2'] = df['직종명2'].apply(self.ppc_special)
+        df['직종명1'] = df['직종명1'].apply(self.ppc_special)
+        return df 
         
 
-class ppc_job_specific:
+class ppc_job_specific(ppc_tool):
 
     def __init__(self,df):
         self.df = df
@@ -72,18 +111,6 @@ class ppc_job_specific:
     def ppc_job_specific(self):
         df = self.df
         df = self.ppc_nan(df)
-
-        # temp code: 직종코드 따올때까지 유효 # 
-        df['직종코드'] = df['모집직종'].apply(self.ppc_domain)
-        domain_code = pd.read_csv('data/raw_data/직종코드.csv',encoding='mbcs',dtype='string')[['직종코드3','직종명3','직종명2','직종명1']]
-        df = df.merge(domain_code,how='inner',left_on='직종코드',right_on='직종코드3') #직종코드 사전에 없는 직종코드는 삭제
-        df.dropna(subset=['직종코드3'],inplace=True)
-        df.drop(columns=['직종코드','직종코드3'],inplace=True)
-        df['직종명3'] = df['직종명3'].apply(self.ppc_special)
-        df['직종명2'] = df['직종명2'].apply(self.ppc_special)
-        df['직종명1'] = df['직종명1'].apply(self.ppc_special)
-        ######################################
-
 
         df['모집직종'] = df['모집직종'].apply(self.ppc_area)
         df['구인제목'] = df['구인제목'].apply(self.ppc_title)
@@ -98,7 +125,7 @@ class ppc_job_specific:
         df['고용형태'] = df['고용형태'].apply(self.ppc_work_form)
         df['기타우대조건'] = df['기타우대조건'].apply(self.ppc_preferential_etc)
         df['인근전철역'] = df['인근전철역'].apply(self.ppc_subway)
-        df['근무시간'] = df['근무시간'].apply(self.ppc_work__time)
+        df['근무시간/형태'] = df['근무시간/형태'].apply(self.ppc_work__time)
         return df
 
     # 결측치 처리 #
